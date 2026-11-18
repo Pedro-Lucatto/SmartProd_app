@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using SmartProd.API.Server.Data;
 using SmartProd.API.Server.Enum;
 
@@ -40,19 +40,19 @@ namespace SmartProd.API.Server.Services
                 })
                 .ToListAsync();
 
-            // Busca nome dos produtos (considerando produtos podem não existir!)
-            var resultado = await Task.WhenAll(
-                producaoPorProduto.Select(async p =>
-                {
-                    var produto = await _context.Produtos.FindAsync(p.ProductId);
-                    return new
-                    {
-                        productId = p.ProductId,
-                        nome = produto?.Name ?? "Desconhecido",
-                        totalProduzido = p.TotalProduzido
-                    };
-                })
-            );
+            // Busca nome dos produtos de forma consolidada e thread-safe (sem concorrência em DbContext)
+            var productIds = producaoPorProduto.Select(p => p.ProductId).Distinct().ToList();
+            var productMap = await _context.Produtos
+                .AsNoTracking()
+                .Where(p => productIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.Name);
+
+            var resultado = producaoPorProduto.Select(p => new
+            {
+                productId = p.ProductId,
+                nome = productMap.GetValueOrDefault(p.ProductId, "Desconhecido"),
+                totalProduzido = p.TotalProduzido
+            }).ToList();
 
             return new
             {
@@ -97,18 +97,18 @@ namespace SmartProd.API.Server.Services
                 })
                 .ToListAsync();
 
-            var resultado = await Task.WhenAll(
-                consumo.Select(async item =>
-                {
-                    var produto = await _context.Produtos.FindAsync(item.ProductId);
-                    return new
-                    {
-                        productId = item.ProductId,
-                        produto = produto?.Name ?? "Desconhecido",
-                        totalConsumido = item.TotalConsumido
-                    };
-                })
-            );
+            var consumoProductIds = consumo.Select(c => c.ProductId).Distinct().ToList();
+            var consumoProductMap = await _context.Produtos
+                .AsNoTracking()
+                .Where(p => consumoProductIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.Name);
+
+            var resultado = consumo.Select(item => new
+            {
+                productId = item.ProductId,
+                produto = consumoProductMap.GetValueOrDefault(item.ProductId, "Desconhecido"),
+                totalConsumido = item.TotalConsumido
+            }).ToList();
 
             return resultado;
         }
@@ -130,19 +130,19 @@ namespace SmartProd.API.Server.Services
                 })
                .ToListAsync();
 
-           var resultado = await Task.WhenAll(
-                vendas.Select(async item =>
-                 {
-                     var produto = await _context.Produtos.FindAsync(item.ProductId);
-                    return new
-                    {
-                         productId = item.ProductId,
-                         produto = produto?.Name ?? "Desconhecido",
-                        quantidadeVendida = item.QuantidadeVendida,
-                        totalFaturado = item.TotalFaturado
-                    };
-                })
-             );
+            var vendasProductIds = vendas.Select(v => v.ProductId).Distinct().ToList();
+            var vendasProductMap = await _context.Produtos
+                .AsNoTracking()
+                .Where(p => vendasProductIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.Name);
+
+            var resultado = vendas.Select(item => new
+            {
+                productId = item.ProductId,
+                produto = vendasProductMap.GetValueOrDefault(item.ProductId, "Desconhecido"),
+                quantidadeVendida = item.QuantidadeVendida,
+                totalFaturado = item.TotalFaturado
+            }).ToList();
 
             return resultado;
         }

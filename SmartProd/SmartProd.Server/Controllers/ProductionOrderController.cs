@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartProd.API.Server.DTOs;
 using SmartProd.API.Server.Enum;
@@ -21,15 +22,14 @@ namespace SmartProd.API.Server.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateOrder([FromBody] OrdemProducaoCreateDto dto)
         {
-            try
+            var usuarioIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(usuarioIdClaim, out var usuarioId))
             {
-                var result = await _service.CreateOrderAsync(dto);
-                return StatusCode(201, new { message = "Ordem de produção criada com sucesso!", result });
+                dto.UsuarioId = usuarioId;
             }
-            catch (System.Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+
+            var result = await _service.CreateOrderAsync(dto);
+            return StatusCode(201, new { message = "Ordem de produção criada com sucesso!", result });
         }
 
         [HttpGet]

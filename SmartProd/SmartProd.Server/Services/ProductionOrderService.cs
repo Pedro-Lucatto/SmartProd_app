@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using SmartProd.API.Server.Data;
 using SmartProd.API.Server.DTOs;
 using SmartProd.API.Server.Enum;
@@ -91,15 +91,34 @@ namespace SmartProd.API.Server.Services
 
                 if (order.Produto != null)
                 {
+                    var producedQty = produced ?? order.Quantity;
                     var movimentacao = new Movimentacao
                     {
                         ProductId = order.ProductId,
                         OrderId = order.Id,
                         Tipo = TipoMovimentacao.PRODUCAO,
-                        Quantity = produced ?? order.Quantity,
+                        Quantity = producedQty,
                         CreatedAt = DateTime.UtcNow
                     };
                     _context.Movimentacoes.Add(movimentacao);
+
+                    order.Produto.EstoqueAtual += producedQty;
+                    order.Produto.UpdatedAt = DateTime.UtcNow;
+
+                    var stock = await _context.Estoque.FirstOrDefaultAsync(entry => entry.ProductId == order.ProductId);
+                    if (stock is null)
+                    {
+                        _context.Estoque.Add(new Estoque
+                        {
+                            ProductId = order.ProductId,
+                            Quantity = order.Produto.EstoqueAtual,
+                            Unit = order.Produto.Unit
+                        });
+                    }
+                    else
+                    {
+                        stock.Quantity = order.Produto.EstoqueAtual;
+                    }
                 }
             }
 

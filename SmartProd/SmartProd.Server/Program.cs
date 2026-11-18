@@ -25,15 +25,36 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
 
-var corsOrigins = (builder.Configuration["CORS_ORIGINS"] ?? builder.Configuration["Cors:Origins"] ?? string.Empty)
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor |
+                               Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+var configuredOrigins = (builder.Configuration["CORS_ORIGINS"] ?? builder.Configuration["Cors:Origins"] ?? string.Empty)
     .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+var defaultOrigins = new[] { "http://localhost", "http://localhost:5173", "http://localhost:3000", "http://localhost:80", "http://localhost:8080" };
+var allowedOrigins = configuredOrigins.Length > 0 ? configuredOrigins.Concat(defaultOrigins).Distinct().ToArray() : defaultOrigins;
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins(corsOrigins.Length == 0 ? ["http://localhost:5173"] : corsOrigins)
-              .AllowAnyHeader()
-              .AllowAnyMethod();
+        if (configuredOrigins.Contains("*"))
+        {
+            policy.SetIsOriginAllowed(_ => true)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+        else
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
     });
 });
 
@@ -110,6 +131,7 @@ builder.Services.AddHealthChecks().AddCheck<PostgresHealthCheck>("postgresql", t
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+app.UseForwardedHeaders();
 
 if (builder.Configuration.GetValue("Database:ApplyMigrations", true))
 {

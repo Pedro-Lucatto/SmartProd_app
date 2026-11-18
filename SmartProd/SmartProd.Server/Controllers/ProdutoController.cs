@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QRCoder;
 using SmartProd.API.Server.DTOs;
@@ -25,76 +25,41 @@ namespace SmartProd.API.Server.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateProduct([FromBody] ProdutoCreateDto dto)
         {
-            try
-            {
-                var usuarioIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                if (usuarioIdClaim == null) return Unauthorized();
+            var usuarioIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (usuarioIdClaim == null) return Unauthorized();
 
-                int usuarioId = int.Parse(usuarioIdClaim);
-                var product = await _produtoService.CreateProductAsync(dto, usuarioId);
-                return CreatedAtAction(nameof(GetProductById), new { id = product.Id }, product);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+            int usuarioId = int.Parse(usuarioIdClaim);
+            var product = await _produtoService.CreateProductAsync(dto, usuarioId);
+            return CreatedAtAction(nameof(GetProductById), new { id = product.Id }, product);
         }
 
         [HttpGet]
         public async Task<IActionResult> GetAllProducts()
         {
-            try
-            {
-                var products = await _produtoService.GetAllProductsAsync();
-                return Ok(products);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = ex.Message });
-            }
+            var products = await _produtoService.GetAllProductsAsync();
+            return Ok(products);
         }
 
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetProductById(int id)
         {
-            try
-            {
-                var product = await _produtoService.GetProductByIdAsync(id);
-                return Ok(product);
-            }
-            catch (Exception ex)
-            {
-                return NotFound(new { error = ex.Message });
-            }
+            var product = await _produtoService.GetProductByIdAsync(id);
+            return Ok(product);
         }
 
         [HttpPut("{id:int}")]
         public async Task<IActionResult> UpdateProduct(int id, [FromBody] ProdutoCreateDto dto)
         {
-            try
-            {
-                return Ok(await _produtoService.UpdateProductAsync(id, dto));
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+            return Ok(await _produtoService.UpdateProductAsync(id, dto));
         }
 
         [HttpGet("by-code/{code}")]
         public async Task<IActionResult> GetProductByCode(string code)
         {
-            try
-            {
-                var product = await _produtoService.GetProductByCodeAsync(code);
-                if (product == null)
-                    return NotFound(new { error = "Produto não encontrado." });
-                return Ok(product);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = ex.Message });
-            }
+            var product = await _produtoService.GetProductByCodeAsync(code);
+            if (product == null)
+                return NotFound(new { error = "Produto não encontrado." });
+            return Ok(product);
         }
 
         [HttpGet("{code}/qrcode")]
