@@ -4,33 +4,35 @@ import { afterEach, vi } from "vitest"
 
 // Mock ResizeObserver for Radix UI & popper elements
 if (typeof globalThis.ResizeObserver === "undefined") {
-  globalThis.ResizeObserver = class ResizeObserver {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
+  class MockResizeObserver {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
   }
+  globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
 }
 
 // Mock IntersectionObserver
 if (typeof globalThis.IntersectionObserver === "undefined") {
-  globalThis.IntersectionObserver = class IntersectionObserver {
-    root = null
-    rootMargin = ""
-    thresholds = []
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-    takeRecords() {
+  class MockIntersectionObserver implements IntersectionObserver {
+    readonly root: Element | Document | null = null
+    readonly rootMargin: string = ""
+    readonly thresholds: ReadonlyArray<number> = []
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+    takeRecords(): IntersectionObserverEntry[] {
       return []
     }
-  } as any
+  }
+  globalThis.IntersectionObserver = MockIntersectionObserver
 }
 
 // Mock window.matchMedia
 if (typeof window !== "undefined" && !window.matchMedia) {
   Object.defineProperty(window, "matchMedia", {
     writable: true,
-    value: vi.fn().mockImplementation((query) => ({
+    value: vi.fn().mockImplementation((query: string) => ({
       matches: false,
       media: query,
       onchange: null,
