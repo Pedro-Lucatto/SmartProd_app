@@ -10,6 +10,11 @@ env:
   DOTNET_VERSION: '10.0.x'
   NODE_VERSION: '20.x'
 
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
 jobs:
   backend-test:
     name: Backend - Build & Test
@@ -59,6 +64,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: SmartProd/frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -72,9 +78,36 @@ jobs:
       - name: Build
         run: npm run build
 
+  pi-tests:
+    name: PI Tests - Jest & Supertest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./pi-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: pi-tests/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run PI Tests
+        run: npm test
+
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
 
@@ -85,9 +118,13 @@ jobs:
           scan-ref: '.'
           format: 'sarif'
           output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
         with:
           sarif_file: 'trivy-results.sarif'
 
@@ -105,7 +142,8 @@ jobs:
       - name: Build backend image
         uses: docker/build-push-action@v5
         with:
-          context: ./SmartProd/SmartProd.Server
+          context: ./SmartProd
+          file: ./SmartProd/SmartProd.Server/Dockerfile
           push: false
           tags: smartprod/backend:test
           load: true
@@ -114,6 +152,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./SmartProd/frontend
+          file: ./SmartProd/frontend/Dockerfile
           push: false
           tags: smartprod/frontend:test
           load: true

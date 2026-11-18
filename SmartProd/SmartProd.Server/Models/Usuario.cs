@@ -1,4 +1,4 @@
-﻿using SmartProd.API.Server.Enum;
+using SmartProd.API.Server.Enum;
 using System.Text.Json.Serialization;
 
 namespace SmartProd.API.Server.Models
