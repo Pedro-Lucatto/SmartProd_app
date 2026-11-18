@@ -1,7 +1,9 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using SmartProd.API.Server.Data;
 using SmartProd.API.Server.DTOs;
 using SmartProd.API.Server.Enum;
+using SmartProd.API.Server.Hubs;
 using SmartProd.API.Server.Models;
 using SmartProd.API.Server.Utils;
 
@@ -10,9 +12,12 @@ namespace SmartProd.API.Server.Services
     public class ProductionOrderService
     {
         private readonly AppDbContext _context;
-        public ProductionOrderService(AppDbContext context)
+        private readonly IHubContext<ProductionHub>? _hubContext;
+
+        public ProductionOrderService(AppDbContext context, IHubContext<ProductionHub>? hubContext = null)
         {
             _context = context;
+            _hubContext = hubContext;
         }
 
         public async Task<object> CreateOrderAsync(OrdemProducaoCreateDto data)
@@ -123,6 +128,26 @@ namespace SmartProd.API.Server.Services
             }
 
             await _context.SaveChangesAsync();
+
+            if (_hubContext != null)
+            {
+                try
+                {
+                    await _hubContext.Clients.All.SendAsync("OrderUpdated", new
+                    {
+                        orderId = order.Id,
+                        productId = order.ProductId,
+                        status = order.Status.ToString(),
+                        produced = order.Produced,
+                        finishedAt = order.FinishedAt
+                    });
+                }
+                catch
+                {
+                    // Falha em telemetria em tempo real não impede persistência transacional
+                }
+            }
+
             return order;
         }
     }

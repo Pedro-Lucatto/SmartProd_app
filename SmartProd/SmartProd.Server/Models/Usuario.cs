@@ -15,6 +15,10 @@ namespace SmartProd.API.Server.Models
         public string? RefreshTokenHash { get; set; }
         [JsonIgnore]
         public DateTime? RefreshTokenExpiresAt { get; set; }
+        [JsonIgnore]
+        public int FailedLoginAttempts { get; set; } = 0;
+        [JsonIgnore]
+        public DateTime? LockoutUntilUtc { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public bool Active { get; set; }
         public string? Department { get; set; }

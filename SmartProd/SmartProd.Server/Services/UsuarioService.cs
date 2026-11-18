@@ -62,8 +62,27 @@ namespace SmartProd.API.Server.Services
             if (user == null || !user.Active)
                 throw new UnauthorizedAccessException("Credenciais inválidas.");
 
+            // Proteção contra Força Bruta Distribuída (Account Lockout)
+            if (user.LockoutUntilUtc.HasValue && user.LockoutUntilUtc.Value > DateTime.UtcNow)
+            {
+                var remainingMinutes = Math.Ceiling((user.LockoutUntilUtc.Value - DateTime.UtcNow).TotalMinutes);
+                throw new UnauthorizedAccessException($"Conta temporariamente bloqueada por segurança. Tente novamente em {remainingMinutes} minuto(s).");
+            }
+
             if (!BCrypt.Net.BCrypt.Verify(dto.Senha, user.Senha))
+            {
+                user.FailedLoginAttempts++;
+                if (user.FailedLoginAttempts >= 5)
+                {
+                    user.LockoutUntilUtc = DateTime.UtcNow.AddMinutes(15);
+                }
+                await _context.SaveChangesAsync();
                 throw new UnauthorizedAccessException("Credenciais inválidas.");
+            }
+
+            // Sucesso no login: resetar contador de falhas e desbloquear
+            user.FailedLoginAttempts = 0;
+            user.LockoutUntilUtc = null;
 
             var token = BuildToken(user);
             var refreshToken = CreateRefreshToken();

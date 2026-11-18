@@ -85,6 +85,7 @@ builder.Services.AddScoped<SeedService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<IndustrialOperationsService>();
 builder.Services.AddScoped<TenantProvisioningService>();
+builder.Services.AddSignalR();
 
 // JWT Authentication
 var jwtSecret = builder.Configuration["JWT_SECRET"]
@@ -197,6 +198,7 @@ if (builder.Configuration.GetValue("Database:ApplyMigrations", true))
     }
 }
 
+app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseExceptionHandler();
 
@@ -213,6 +215,7 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<SmartProd.API.Server.Hubs.ProductionHub>("/hubs/production");
 
 app.Run();
 
