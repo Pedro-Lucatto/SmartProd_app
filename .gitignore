@@ -368,3 +368,5 @@ FodyWeavers.xsd
 !.env.example
 !**/.env.example
 *.tsbuildinfo
+**/__pycache__/
+SmartProd/frontend/vite.config.d.ts

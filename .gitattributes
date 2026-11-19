@@ -61,3 +61,5 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+# Cloud Shell scripts must keep Unix line endings, including Windows checkouts.
+*.sh text eol=lf

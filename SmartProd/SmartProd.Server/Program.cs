@@ -134,7 +134,8 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 app.UseForwardedHeaders();
 
-if (builder.Configuration.GetValue("Database:ApplyMigrations", true))
+var migrateOnly = args.Contains("--migrate-only", StringComparer.Ordinal);
+if (migrateOnly || builder.Configuration.GetValue("Database:ApplyMigrations", true))
 {
     await using var scope = app.Services.CreateAsyncScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -196,6 +197,13 @@ if (builder.Configuration.GetValue("Database:ApplyMigrations", true))
             await dbContext.SaveChangesAsync();
         }
     }
+}
+
+// Cloud Run Job: finish after migrations/bootstrap instead of opening an HTTP server.
+if (migrateOnly)
+{
+    await app.DisposeAsync();
+    return;
 }
 
 app.UseMiddleware<SecurityHeadersMiddleware>();
