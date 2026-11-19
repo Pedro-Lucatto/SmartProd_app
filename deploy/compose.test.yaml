@@ -1,0 +1,45 @@
+# Isolated, disposable test stack. No production volumes or database ports.
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: SmartProd
+      POSTGRES_USER: smartprod
+      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:?}
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U smartprod -d SmartProd]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  migrate:
+    image: smartprod-test-api
+    command: [--migrate-only]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      DB_CONNECTION_STRING: Host=db;Database=SmartProd;Username=smartprod;Password=${TEST_DB_PASSWORD:?}
+      JWT_SECRET: ${TEST_JWT_SECRET:?}
+      Jwt__Issuer: SmartProd.Staging
+      ADMIN_INITIAL_EMAIL: ${SMOKE_EMAIL:?}
+      ADMIN_INITIAL_PASSWORD: ${SMOKE_PASSWORD:?}
+    depends_on:
+      db:
+        condition: service_healthy
+  backend:
+    image: smartprod-test-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      DB_CONNECTION_STRING: Host=db;Database=SmartProd;Username=smartprod;Password=${TEST_DB_PASSWORD:?}
+      JWT_SECRET: ${TEST_JWT_SECRET:?}
+      Jwt__Issuer: SmartProd.Staging
+      Database__ApplyMigrations: 'false'
+    ports: [127.0.0.1:15481:8080]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  frontend:
+    image: smartprod-test-web
+    environment:
+      PORT: '8080'
+      BACKEND_URL: http://backend:8080
+    ports: [127.0.0.1:18080:8080]
+    depends_on: [backend]

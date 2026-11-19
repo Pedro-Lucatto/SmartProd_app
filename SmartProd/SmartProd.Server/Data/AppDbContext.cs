@@ -380,12 +380,6 @@ namespace SmartProd.API.Server.Data
             }
 
             var trackedStates = CaptureTrackedStates(pendingAudit);
-            foreach (var trackedState in trackedStates)
-            {
-                var entry = trackedState.Entry;
-                entry.State = EntityState.Unchanged;
-            }
-
             AuditEvents.AddRange(pendingAudit.Select(CreateAuditEvent));
             base.SaveChanges(acceptAllChangesOnSuccess: true);
             RestoreTrackedStates(trackedStates, acceptAllChangesOnSuccess);
@@ -404,48 +398,41 @@ namespace SmartProd.API.Server.Data
             }
 
             var trackedStates = CaptureTrackedStates(pendingAudit);
-            foreach (var trackedState in trackedStates)
-            {
-                var entry = trackedState.Entry;
-                entry.State = EntityState.Unchanged;
-            }
-
             AuditEvents.AddRange(pendingAudit.Select(CreateAuditEvent));
             await base.SaveChangesAsync(acceptAllChangesOnSuccess: true, cancellationToken);
             RestoreTrackedStates(trackedStates, acceptAllChangesOnSuccess);
         }
 
-        private static List<TrackedEntityState> CaptureTrackedStates(List<PendingAudit> pendingAudit) =>
-            pendingAudit.Select(audit => audit.Entry).Distinct()
-                .Select(entry => new TrackedEntityState(
-                    entry,
-                    entry.State,
-                    entry.CurrentValues.Clone(),
-                    entry.OriginalValues.Clone(),
+        private List<TrackedEntityState> CaptureTrackedStates(List<PendingAudit> pendingAudit)
+        {
+            var states = pendingAudit.Select(audit => audit.Entry).Distinct()
+                .Select(entry => new TrackedEntityState(entry, entry.State,
+                    entry.CurrentValues.Clone(), entry.OriginalValues.Clone(),
                     entry.Properties.ToDictionary(property => property.Metadata.Name, property => property.IsModified)))
                 .ToList();
+            // Accept rather than assigning Unchanged: the latter rejects modified
+            // values, while AcceptAllChanges finalizes database-generated identities.
+            ChangeTracker.AcceptAllChanges();
+            return states.Select(state => state with { CurrentValues = state.Entry.CurrentValues.Clone() }).ToList();
+        }
 
         private static void RestoreTrackedStates(
             List<TrackedEntityState> trackedStates,
             bool acceptAllChangesOnSuccess)
         {
+            if (acceptAllChangesOnSuccess)
+                return;
             foreach (var trackedState in trackedStates)
             {
                 var entry = trackedState.Entry;
                 entry.State = EntityState.Unchanged;
-                entry.CurrentValues.SetValues(trackedState.CurrentValues);
+                // Database identity keys are finalized by the audit save. Never
+                // overwrite them with a snapshot containing a temporary key.
+                foreach (var property in entry.Properties.Where(property => !property.Metadata.IsPrimaryKey()))
+                    property.CurrentValue = trackedState.CurrentValues[property.Metadata.Name];
 
-                if (acceptAllChangesOnSuccess)
-                {
-                    entry.OriginalValues.SetValues(trackedState.CurrentValues);
-                    if (trackedState.State == EntityState.Deleted)
-                        entry.State = EntityState.Detached;
-                    else
-                        entry.State = EntityState.Unchanged;
-                    continue;
-                }
-
-                entry.OriginalValues.SetValues(trackedState.OriginalValues);
+                foreach (var property in entry.Properties.Where(property => !property.Metadata.IsPrimaryKey()))
+                    property.OriginalValue = trackedState.OriginalValues[property.Metadata.Name];
                 entry.State = trackedState.State;
                 if (trackedState.State == EntityState.Modified)
                 {
